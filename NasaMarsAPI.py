@@ -1,47 +1,91 @@
-import threading
+import json
+import turtle
+import urllib.request 
+import time 
+import webbrowser 
+import geocoder 
 import requests
-import time
+import datetime
 
-# Global list to store the API data
-global_list = []
 
-# self generated api
-api = "4bOaDypa4mq2rEacKbJBXh4jd1focojzCi6eJtsz"
+# First API request and set up 
+# fetching data from ISS
 
-lock=threading.Lock()
+url = "http://api.open-notify.org/astros.json"
+response = urllib.request.urlopen(url)
+result = json.loads(response.read())
+file = open("iss.txt","w")
+file.write("there are currently" + 
+           str(result["number"]) + " astronauts on the iss: \n\n")
+people = result["people"]
 
-# Function to make API request and process the response
-def worker(earth_date, thread_id):
-    url = f"https://api.nasa.gov/mars-photos/api/v1/rovers/curiosity/photos?earth_date={earth_date}&api_key={api}"
-    response = requests.get(url).json()
-    time.sleep(2)  # delay
-    photos = response['photos']
-    for photo in photos:
-        #using lock to prevent data corruption during multithreading concurrency
-        with lock:
-            img_url = photo["img_src"]
-            earth_date = photo["earth_date"]
-            global_list.append(f"{img_url}, {earth_date}, Thread-{thread_id}")
+for p in people: 
+    file.write(p['name'] + " - on board" + "\n")
+# print longitude and latitude 
+g = geocoder.ip('me')
+file.write("\nYour current latitude and longitude is: " + str(g.latlng))
+file.close()
+webbrowser.open("iss.txt")
 
-# thread creation
-threads = []
-t1 = threading.Thread(target=worker, args=("2018-01-01/2018-01-10", 1))
-threads.append(t1)
-t2 = threading.Thread(target=worker, args=("2019-01-01/2019-01-10", 2))
-threads.append(t1)
-t3 = threading.Thread(target=worker, args=("2020-01-01/2020-01-10", 3))
-threads.append(t1)
+# set up world map in turtle module
 
-# Start all threads
-t1.start()
-t2.start()
-t3.start()
+screen = turtle.Screen()
+screen.setup(1280,720)
+screen.setworldcoordinates(-180,-90,180,90)
 
-# thread join (wait)
-t1.join()
-t2.join()
-t3.join()
+# load world map image
+screen.bgpic("map.gif")
+screen.register_shape("iss.gif")
+iss = turtle.Turtle()
+iss.shape("iss.gif")
+iss.setheading(45)
+iss.penup()
 
-# print list
-for item in global_list:
-    print(item)
+# Next API, Astronomy picture of the day
+
+api_key = 'ZWXN2DHNj5g4Ivn0nntSmUkJHdxLSr6TlVk8HqLJ'
+
+api_url = 'https://api.nasa.gov/planetary/apod'
+
+# parameters 
+
+
+# Get the current date
+current_date = datetime.datetime.now().strftime('%Y-%m-%d')
+
+params = {
+    'api_key' : api_key,
+     
+    'hd' : 'True',
+    
+    'date' : current_date
+}
+
+response = requests.get(api_url,params = params)
+json_data = json.loads(response.text)
+image_url = json_data['url']
+webbrowser.open(image_url)
+
+while True: 
+    #load current status of ISS in real time
+    url = "http://api.open-notify.org/iss-now.json"
+    response = urllib.request.urlopen(url)
+    result = json.loads(response.read()) 
+    # extract ISS location
+    location = result["iss_position"]
+    lat = location['latitude']
+    lon = location['longitude']
+    
+    #output to the terminal (latitude and longitude)
+    
+    lat = float(lat)
+    lon = float(lon)
+    
+    print("\nLatitude: " + str(lat))
+    print("\nLongitude: " + str(lon))
+    
+    # update ISS location on the map
+    iss.goto(lon,lat)
+    
+    # refresh each 5 seconds
+    time.sleep(5)
